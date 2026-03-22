@@ -1,187 +1,165 @@
 import streamlit as st
-import adawat.adaat
+import pyarabic.araby as araby
+import pyarabic.number as number
+import mishkal.tashkeel
+import qalsadi.lemmatizer
+import tashaphyne.stemming
 
 # ==========================================
 # 1. إعدادات الصفحة وتنسيق الواجهة (RTL)
 # ==========================================
-st.set_page_config(page_title="تطبيق مكتبة أدوات الشامل", page_icon="🛠️", layout="wide")
+st.set_page_config(page_title="التطبيق الشامل لمعالجة اللغة العربية", page_icon="🛠️", layout="wide")
 
 st.markdown("""
     <style>
-    /* توجيه النصوص من اليمين لليسار */
     .stApp { direction: rtl; text-align: right; font-family: 'Tajawal', sans-serif; }
     .stTextArea textarea { direction: rtl; text-align: right; font-size: 18px;}
     .css-1d391kg { direction: rtl; text-align: right; }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🛠️ التطبيق الشامل لمكتبة أدوات (Adawat)")
-st.write("هذا التطبيق يجمع كل خصائص مكتبة أدوات لمعالجة النصوص العربية.")
+st.title("🛠️ التطبيق الشامل لمعالجة النصوص العربية")
+st.write("يستخدم هذا التطبيق الحزمة الكاملة لأدوات طه زروقي (PyArabic, Qalsadi, Tashaphyne, Mishkal).")
 st.divider()
 
 # ==========================================
-# 2. الشريط الجانبي (Sidebar) لاختيار الأقسام
+# 2. الشريط الجانبي (Sidebar)
 # ==========================================
 st.sidebar.header("أقسام المعالجة")
 category = st.sidebar.selectbox("اختر القسم المطلوب:", [
-    "1. التشكيل وإزالته (Tashkeel)",
-    "2. التحويل والنقحرة (Transformation)",
-    "3. التحليل والتوليد (Analysis & Generation)",
-    "4. الاستخلاص (Extraction)",
-    "5. متفرقات (Divers)"
+    "1. التشكيل وإزالة الحركات",
+    "2. التحويل والتفقيط",
+    "3. التحليل الصرفي والتجذير (Stemming)",
+    "4. التقطيع والاستخلاص",
+    "5. متفرقات (تنسيق الشعر)"
 ])
 
 # ==========================================
-# 3. واجهة إدخال النص الرئيسي
+# 3. إدخال النص
 # ==========================================
-user_text = st.text_area("أدخل النص العربي (أو اللاتيني حسب نوع العملية):", height=150)
+user_text = st.text_area("أدخل النص العربي أو الأرقام هنا:", height=150)
 
 # ==========================================
 # 4. المعالجة بناءً على القسم المختار
 # ==========================================
 
 # ----------------- القسم الأول: التشكيل -----------------
-if category == "1. التشكيل وإزالته (Tashkeel)":
-    st.subheader("تشكيل النص وإزالة الحركات")
-    tashkeel_action = st.radio("اختر العملية:", [
-        "تشكيل النص (Tashkeel)", 
-        "اختزال الحركات (Reduce)", 
-        "إزالة التشكيل (Strip)"
-    ])
+if category == "1. التشكيل وإزالة الحركات":
+    st.subheader("التشكيل الآلي وإزالة الحركات")
+    action = st.radio("اختر العملية:", ["تشكيل النص (Mishkal)", "إزالة التشكيل بالكامل (Strip)"])
     
-    last_mark = st.checkbox("تفعيل تشكيل أواخر الكلمات (الإعراب)", value=True)
-    
-    if st.button("تنفيذ العملية"):
+    if st.button("تنفيذ"):
         if user_text.strip():
-            try:
-                if tashkeel_action == "تشكيل النص (Tashkeel)":
-                    result = adawat.adaat.tashkeel_text(user_text, last_mark)
-                elif tashkeel_action == "اختزال الحركات (Reduce)":
-                    result = getattr(adawat.adaat, 'reduce', lambda x: "الوظيفة قيد التطوير")(user_text)
-                elif tashkeel_action == "إزالة التشكيل (Strip)":
-                    result = getattr(adawat.adaat, 'strip', lambda x: "الوظيفة قيد التطوير")(user_text)
-                
-                st.success("النتيجة:")
-                st.code(result, language="text")
-            except AttributeError as e:
-                st.error(f"عذراً، الدالة غير متوفرة بهذا الاسم الدقيق في النسخة الحالية: {e}")
+            with st.spinner("جاري المعالجة..."):
+                if action == "تشكيل النص (Mishkal)":
+                    vocalizer = mishkal.tashkeel.TashkeelClass()
+                    result = vocalizer.tashkeel(user_text)
+                else:
+                    result = araby.strip_tashkeel(user_text)
+            st.success("النتيجة:")
+            st.code(result, language="text")
         else:
             st.warning("الرجاء إدخال نص أولاً.")
 
 # ----------------- القسم الثاني: التحويل -----------------
-elif category == "2. التحويل والنقحرة (Transformation)":
-    st.subheader("تحويل النصوص والنقحرة")
-    trans_action = st.radio("اختر العملية:", [
-        "نقحرة إلى اللاتينية (Romanize)", 
-        "تعريب نص لاتيني (Arabize)", 
-        "قلب النص (Inverse)", 
-        "التفقيط: تحويل الأرقام لنصوص (Numbers to words)",
-        "تنميط النص (Normalize)",
-        "فك تشابك الحروف (Unshape)"
+elif category == "2. التحويل والتفقيط":
+    st.subheader("تحويل الأرقام وتنميط الحروف")
+    action = st.radio("اختر العملية:", [
+        "التفقيط (تحويل الأرقام إلى نصوص)", 
+        "تنميط النص (توحيد الهمزات والألفات)"
     ])
     
-    if st.button("تنفيذ العملية"):
+    if st.button("تنفيذ"):
         if user_text.strip():
-            try:
-                # استخدام getattr لتجنب توقف التطبيق إذا اختلف اسم الدالة برمجياً عن الوثائق
-                if "Romanize" in trans_action:
-                    result = adawat.adaat.romanize(user_text)
-                elif "Arabize" in trans_action:
-                    result = adawat.adaat.arabize(user_text)
-                elif "Inverse" in trans_action:
-                    result = adawat.adaat.inverse(user_text)
-                elif "Numbers to words" in trans_action:
-                    result = adawat.adaat.numbers_to_words(user_text)
-                elif "Normalize" in trans_action:
-                    result = adawat.adaat.normalize(user_text)
-                elif "Unshape" in trans_action:
-                    result = adawat.adaat.unshape(user_text)
-                
-                st.success("النتيجة:")
-                st.code(result, language="text")
-            except AttributeError as e:
-                st.error(f"عذراً، الدالة غير متوفرة بهذا الاسم الدقيق في النسخة الحالية: {e}")
-        else:
-            st.warning("الرجاء إدخال نص أولاً.")
-
-# ----------------- القسم الثالث: التحليل -----------------
-elif category == "3. التحليل والتوليد (Analysis & Generation)":
-    st.subheader("التحليل الصرفي وتجزئة الكلمات")
-    analysis_action = st.radio("اختر العملية:", [
-        "تحليل صرفي (Stem)", 
-        "تجزئة النص إلى كلمات (Tokenize)", 
-        "تصنيف الكلمات (Wordtag)", 
-        "توليد أشكال الكلمة (Affixate)"
-    ])
-    
-    if st.button("تنفيذ العملية"):
-        if user_text.strip():
-            try:
-                if "Stem" in analysis_action:
-                    result = adawat.adaat.stem(user_text)
-                elif "Tokenize" in analysis_action:
-                    result = adawat.adaat.tokenize(user_text)
-                elif "Wordtag" in analysis_action:
-                    result = adawat.adaat.wordtag(user_text)
-                elif "Affixate" in analysis_action:
-                    result = adawat.adaat.affixate(user_text)
-                
-                st.success("النتيجة:")
-                st.write(result) # نستخدم write لأن النتيجة قد تكون قائمة (List)
-            except AttributeError as e:
-                st.error(f"عذراً، الدالة غير متوفرة بهذا الاسم الدقيق في النسخة الحالية: {e}")
-        else:
-            st.warning("الرجاء إدخال نص أولاً.")
-
-# ----------------- القسم الرابع: الاستخلاص -----------------
-elif category == "4. الاستخلاص (Extraction)":
-    st.subheader("استخلاص البيانات من النص")
-    extract_action = st.radio("اختر العملية:", [
-        "استخلاص المتلازمات اللفظية (Collocation)", 
-        "كشف اللغات في النص (Language)", 
-        "استخلاص المسميات (Named Entities)", 
-        "استخلاص العبارات العددية (Numbered Clauses)"
-    ])
-    
-    if st.button("تنفيذ العملية"):
-        if user_text.strip():
-            try:
-                if "Collocation" in extract_action:
-                    result = adawat.adaat.collocation(user_text)
-                elif "Language" in extract_action:
-                    result = adawat.adaat.language(user_text)
-                elif "Named" in extract_action:
-                    result = adawat.adaat.named(user_text)
-                elif "Numbered" in extract_action:
-                    result = adawat.adaat.numbered(user_text)
-                
-                st.success("النتيجة:")
-                st.write(result)
-            except AttributeError as e:
-                st.error(f"عذراً، الدالة غير متوفرة بهذا الاسم الدقيق في النسخة الحالية: {e}")
-        else:
-            st.warning("الرجاء إدخال نص أولاً.")
-
-# ----------------- القسم الخامس: متفرقات -----------------
-elif category == "5. متفرقات (Divers)":
-    st.subheader("وظائف إضافية")
-    misc_action = st.radio("اختر العملية:", [
-        "ضبط قصيدة شعرية (Poetry)", 
-        "توليد نص عشوائي (Random Text)"
-    ])
-    
-    if st.button("تنفيذ العملية"):
-        try:
-            if "Poetry" in misc_action:
-                if user_text.strip():
-                    result = adawat.adaat.poetry(user_text)
+            if action == "التفقيط (تحويل الأرقام إلى نصوص)":
+                try:
+                    num = int(user_text.strip())
+                    result = number.int2word(num)
                     st.success("النتيجة:")
                     st.code(result, language="text")
-                else:
-                    st.warning("الرجاء إدخال أبيات الشعر أولاً.")
-            elif "Random" in misc_action:
-                result = getattr(adawat.adaat, 'random_text', getattr(adawat.adaat, 'random', lambda: "الوظيفة غير متاحة"))()
-                st.success("نص عشوائي:")
+                except ValueError:
+                    st.error("الرجاء إدخال أرقام صحيحة فقط (مثال: 2024).")
+            else:
+                result = araby.normalize_hamza(user_text)
+                result = araby.normalize_alef(result)
+                st.success("النتيجة:")
                 st.code(result, language="text")
-        except AttributeError as e:
-            st.error(f"عذراً، الدالة غير متوفرة بهذا الاسم الدقيق في النسخة الحالية: {e}")
+        else:
+            st.warning("الرجاء إدخال نص أولاً.")
+
+# ----------------- القسم الثالث: التحليل الصرفي -----------------
+elif category == "3. التحليل الصرفي والتجذير (Stemming)":
+    st.subheader("استخراج الجذور والتحليل الصرفي")
+    action = st.radio("اختر العملية:", [
+        "التجذير الخفيف (Light Stemming - Tashaphyne)", 
+        "الرد إلى الأصل (Lemmatization - Qalsadi)"
+    ])
+    
+    if st.button("تنفيذ"):
+        if user_text.strip():
+            words = araby.tokenize(user_text)
+            results = []
+            
+            with st.spinner("جاري التحليل..."):
+                if "Light Stemming" in action:
+                    stemmer = tashaphyne.stemming.ArabicLightStemmer()
+                    for w in words:
+                        stem = stemmer.light_stem(w)
+                        root = stemmer.get_root()
+                        results.append({"الكلمة": w, "الجذع": stem, "الجذر": root})
+                else:
+                    lemmer = qalsadi.lemmatizer.Lemmatizer()
+                    for w in words:
+                        lemma = lemmer.lemmatize(w)
+                        results.append({"الكلمة": w, "الأصل (Lemma)": lemma})
+            
+            st.success("النتيجة:")
+            st.table(results)
+        else:
+            st.warning("الرجاء إدخال نص أولاً.")
+
+# ----------------- القسم الرابع: التقطيع والاستخلاص -----------------
+elif category == "4. التقطيع والاستخلاص":
+    st.subheader("تقطيع الجمل واستخراج الكلمات")
+    action = st.radio("اختر العملية:", [
+        "تقطيع النص إلى جمل (Sentence Tokenize)", 
+        "استخراج الحروف العربية فقط (تصفية النص)"
+    ])
+    
+    if st.button("تنفيذ"):
+        if user_text.strip():
+            if "جمل" in action:
+                # فصل النص إلى جمل بناءً على علامات الترقيم
+                sentences = araby.sentence_tokenize(user_text)
+                st.success(f"تم العثور على {len(sentences)} جملة:")
+                for i, s in enumerate(sentences):
+                    st.write(f"**{i+1}.** {s}")
+            else:
+                # فلترة الحروف العربية فقط
+                result = ''.join([char for char in user_text if araby.is_arabicrange(char) or char == ' '])
+                st.success("النتيجة:")
+                st.code(result, language="text")
+        else:
+            st.warning("الرجاء إدخال نص أولاً.")
+
+# ----------------- القسم الخامس: متفرقات (الشعر) -----------------
+elif category == "5. متفرقات (تنسيق الشعر)":
+    st.subheader("تنسيق الشعر العمودي")
+    st.info("أدخل بيت الشعر وافصل بين الشطرين بعلامة التسطير (_) أو النجمة (*) أو الشباك (#).")
+    
+    if st.button("تنسيق القصيدة"):
+        if user_text.strip():
+            # البحث عن الفاصل لتنسيق الشعر
+            separator = '_' if '_' in user_text else ('*' if '*' in user_text else '#')
+            
+            if separator in user_text:
+                parts = user_text.split(separator)
+                col1, col2 = st.columns(2)
+                with col2: # الشطر الأول يميناً
+                    st.markdown(f"<h4 style='text-align: center;'>{parts[0].strip()}</h4>", unsafe_allow_html=True)
+                with col1: # الشطر الثاني يساراً
+                    st.markdown(f"<h4 style='text-align: center;'>{parts[1].strip()}</h4>", unsafe_allow_html=True)
+            else:
+                st.warning("لم يتم العثور على فاصل. يرجى استخدام _ أو * أو # بين الشطرين.")
+        else:
+            st.warning("الرجاء إدخال بيت شعر أولاً.")
